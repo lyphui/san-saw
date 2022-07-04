@@ -774,6 +774,8 @@ def add_train_args(arg_parser):
                             help='image transform with numpy style')
     arg_parser.add_argument('--color_jitter', default=True, type=str2bool,
                             help='image transform with numpy style')
+    arg_parser.add_argument('--rrotate', default=0.1, type=float,
+                            help='image transform with numpy style')
 
     # optimization related arguments
 
