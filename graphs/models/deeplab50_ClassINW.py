@@ -193,6 +193,7 @@ class ResNetMulti(nn.Module):
         x = self.in1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+
         x = self.layer1(x)
         x_1_ori = x
         x1 = self.classifier_1(x.detach())

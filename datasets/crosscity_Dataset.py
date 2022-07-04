@@ -7,9 +7,10 @@ import copy
 import os
 import torch
 import torch.utils.data as data
-import torchvision.transforms as ttransforms
+import torchvision.transforms as transforms
 
-from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
+from datasets.cityscapes_Dataset import City_Dataset
+from datasets.gta5_Dataset import GTA5_Dataset
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 

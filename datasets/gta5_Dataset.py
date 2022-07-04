@@ -804,13 +804,6 @@ class Mix_xuanran_DataLoader():
         # self.num_iterations = 50
 
 
-
-
-
-
-
-
-
 class CowMix_Dataset_style_1_2(Beiyong_Dataset):
     def __init__(self,
                  args,
@@ -1159,8 +1152,6 @@ class CowMix_r_s_DataLoader():
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
 
 
-
-
 class PS_Dataset(Beiyong_Dataset):
     def __init__(self,
                  args,
@@ -1338,10 +1329,6 @@ class PartStyle_DataLoader():
         # self.num_iterations = 50
 
 
-
-
-
-
 class Raw_TR_Dataset(Beiyong_Dataset):
     def __init__(self,
                  args,
@@ -1517,8 +1504,6 @@ class Raw_TR_DataLoader():
 
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
         # self.num_iterations = 50
-
-
 
 
 class R_SS_Dataset(Beiyong_Dataset):
@@ -1706,7 +1691,6 @@ class RSS_DataLoader():
         # self.num_iterations = 50
 
 
-
 class F_R_SS_Dataset(Beiyong_Dataset):
     def __init__(self,
                  args,
@@ -1890,7 +1874,6 @@ class F_RSS_DataLoader():
 
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
         # self.num_iterations = 50
-
 
 
 class Print_Dataset(Beiyong_Dataset):

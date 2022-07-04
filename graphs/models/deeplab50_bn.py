@@ -4,10 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import argparse
+
 affine_par = True
 import torch.utils.model_zoo as model_zoo
-
-
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -16,6 +15,8 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
+
+
 class Bottleneck(nn.Module):
     expansion = 4
 
@@ -65,7 +66,8 @@ class Classifier_Module(nn.Module):
         self.conv2d_list = nn.ModuleList()
         for dilation, padding in zip(dilation_series, padding_series):
             self.conv2d_list.append(
-                nn.Conv2d(inplanes, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias=True))
+                nn.Conv2d(inplanes, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation,
+                          bias=True))
 
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
@@ -139,7 +141,7 @@ class ResNetMulti(nn.Module):
         x2 = self.layer6(x2)
         x2 = F.interpolate(x2, size=input_size, mode='bilinear', align_corners=True)
 
-        return x2, x1 # changed!
+        return x2, x1  # changed!
 
     def get_1x_lr_params_NOscale(self):
         """
@@ -183,24 +185,19 @@ class ResNetMulti(nn.Module):
                 {'params': self.get_10x_lr_params(), 'lr': 10 * args.lr}]
 
 
-
-def Deeplab50_bn(args,num_classes=21, pretrained=True):
+def Deeplab50_bn(args, num_classes=21, pretrained=True):
     model = ResNetMulti(Bottleneck, [3, 4, 6, 3], num_classes)
 
     if pretrained:
-
-
         model.load_state_dict(model_zoo.load_url(model_urls['resnet50']),
                               strict=False)
     return model
 
-def Deeplab50_bn_(args,num_classes=21, pretrained=True):
+
+def Deeplab50_bn_(args, num_classes=21, pretrained=True):
     model = ResNetMulti(Bottleneck, [3, 4, 6, 3], num_classes)
 
     if pretrained:
-
-
-
         restore_from = './pretrained_model/DeepLab_resnet_pretrained_init-f81d91e8.pth'
         # restore_from = './pretrained_model/GTA5_source.pth'
         saved_state_dict = torch.load(restore_from)
@@ -212,6 +209,7 @@ def Deeplab50_bn_(args,num_classes=21, pretrained=True):
                 new_params['.'.join(i_parts[1:])] = saved_state_dict[i]
         model.load_state_dict(new_params)
     return model
+
 
 if __name__ == '__main__':
     model = ResNetMulti(Bottleneck, [3, 4, 6, 3], 19)
@@ -226,12 +224,11 @@ if __name__ == '__main__':
     new_params = model.state_dict().copy()
 
     for i in saved_state_dict:
-        print("i:",i)
+        print("i:", i)
         i_parts = i.split('.')
 
-
     for i in new_params:
-        print("i_new:",i)
+        print("i_new:", i)
         i_parts = i.split('.')
 
     for i in saved_state_dict:

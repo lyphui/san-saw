@@ -19,12 +19,14 @@ sys.path.append(os.path.abspath('.'))
 from utils.eval import Eval
 from utils.train_helper import get_model
 
-from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader, inv_preprocess, decode_labels
+from datasets.cityscapes_Dataset import City_DataLoader, inv_preprocess, decode_labels
 from datasets.gta5_Dataset import GTA5_DataLoader, GTA5_xuanran_DataLoader, Mix_DataLoader
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
+from datasets.glue_Datasets import Glue_DataLoader
 
 datasets_path = {
-    'cityscapes': {'data_root_path': '../../DATASETS/datasets_original/Cityscapes', 'list_path': '../datasets/city_list',
+    'cityscapes': {'data_root_path': '../../DATASETS/datasets_original/Cityscapes',
+                   'list_path': '../datasets/city_list',
                    'image_path': '../../DATASETS/datasets_original/Cityscapes/leftImg8bit',
                    'gt_path': '../../DATASETS/datasets_original/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '../../DATASETS/datasets_seg/GTA5', 'list_path': '../datasets/GTA5/list',
@@ -45,11 +47,13 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Unsupported value encountered.')
 
+
 class WeightedCrossEntropyLoss(nn.Module):
-    def __init__(self, device=0, ignore = -1):
+    def __init__(self, device=0, ignore=-1):
         super().__init__()
         self.device = device
         self.ignore = ignore
+
     def forward(self, output, target):
         lis = []
         for i in range(19):
@@ -57,36 +61,29 @@ class WeightedCrossEntropyLoss(nn.Module):
             # print(type(non_zero_num))
             gt = (target == i).float()  # B
             inter = torch.sum(gt, dim=(0, 1, 2)).cpu().numpy()  # B
-
-
             total_num = torch.prod(torch.tensor(target.shape)).float()
-
             k = inter.item() / total_num.item()
-
-            lis.append(1-k)
+            lis.append(1 - k)
         # print(lis)
 
         scaled_weight = torch.tensor(lis).cuda(self.device)
         # scaled_weight = torch.tensor([]).cuda(self.device)
-
         # non_zero_num = torch.nonzero(target).shape[0]
         # total_num = torch.prod(torch.tensor(target.shape)).float()
         # k = non_zero_num / total_num
         # scaled_weight = torch.tensor([k, 1-k]).cuda(self.device)
 
         if type(output) == list:
-            loss = F.cross_entropy(output[0], target, weight=scaled_weight, ignore_index= self.ignore)
+            loss = F.cross_entropy(output[0], target, weight=scaled_weight, ignore_index=self.ignore)
             for i in range(1, len(output)):
-                loss += F.cross_entropy(output[i], target, weight=scaled_weight, ignore_index= self.ignore)
+                loss += F.cross_entropy(output[i], target, weight=scaled_weight, ignore_index=self.ignore)
         else:
-            loss = F.cross_entropy(output, target, weight=scaled_weight, ignore_index= self.ignore)
+            loss = F.cross_entropy(output, target, weight=scaled_weight, ignore_index=self.ignore)
 
         return loss
 
 
-
 device_ids = [0]
-
 
 
 class Trainer():
@@ -95,7 +92,7 @@ class Trainer():
         ITER_MAX = args.each_epoch_iters
         self.device = torch.device('cuda:{}'.format(device_ids[0]))
         # os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
-        os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+        # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
         self.cuda = cuda and torch.cuda.is_available()
         # self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
@@ -129,7 +126,6 @@ class Trainer():
             self.model.load_state_dict(torch.load(os.path.join(args.checkpoint_dir, '2.pt')))
             self.model.restored = True
 
-
         # self.model.to(self.device)
         self.model = self.model.cuda()
         self.model = torch.nn.DataParallel(self.model, device_ids=device_ids)
@@ -159,10 +155,15 @@ class Trainer():
             self.dataloader = City_DataLoader(self.args)
         elif self.args.dataset == "gta5":
             self.dataloader = GTA5_DataLoader(self.args)
+        elif self.args.dataset == "glue":
+            self.dataloader = Glue_DataLoader(self.args)
         else:
             self.dataloader = SYNTHIA_DataLoader(self.args)
+
         if self.args.val_dataset == "cityscapes":
             self.test_dataloader = City_DataLoader(self.args)
+        elif self.args.dataset == "glue":
+            self.dataloader = Glue_DataLoader(self.args)
         else:
             self.test_dataloader = SYNTHIA_DataLoader(self.args)
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
@@ -205,7 +206,7 @@ class Trainer():
         pixel_num = []
         for epoch in range(self.current_epoch, self.epoch_num):
 
-            self.train_one_epoch(pixel_num = pixel_num)
+            self.train_one_epoch(pixel_num=pixel_num)
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
             self.writer.add_scalar('PA', PA, self.current_epoch)
@@ -217,7 +218,6 @@ class Trainer():
             is_best = MIoU > self.best_MIou
             torch.save(self.model.module.state_dict(),
                        os.path.join(args.checkpoint_dir, '{}.pt'.format(epoch)))
-
 
             if is_best:
 
@@ -256,10 +256,11 @@ class Trainer():
         ones = ones.transpose(1, 2)
         return ones
 
-    def train_one_epoch(self,pixel_num):
+    def train_one_epoch(self, pixel_num):
         tqdm_epoch = tqdm(self.dataloader.data_loader,
                           total=self.dataloader.num_iterations,
-                          desc="Train Epoch-{}-total-{}".format(self.current_epoch + 1, self.epoch_num),file=sys.stdout)
+                          desc="Train Epoch-{}-total-{}".format(self.current_epoch + 1, self.epoch_num),
+                          file=sys.stdout)
         self.logger.info("Training one epoch...")
         self.Eval.reset()
 
@@ -304,7 +305,6 @@ class Trainer():
             # model
             pred = self.model(x)
 
-
             weights_keys = self.model.state_dict().keys()
 
             selected_keys_classify_1 = []
@@ -327,11 +327,7 @@ class Trainer():
             classsifier_2_weights = weights_t.squeeze()
             # print(classsifier_1_weights.size(),classsifier_2_weights.size())
 
-
-
-
             if isinstance(pred, tuple):
-
                 pred_2 = pred[1]
                 pred_lay2 = pred[2]
                 pred_lay1 = pred[3]
@@ -343,15 +339,15 @@ class Trainer():
                 mid_lay1_iwed = pred[9]
                 pred = pred[0]
 
-            a_ = torch.ones(y.size()[0],y.size()[1],y.size()[2],dtype=torch.long)*args.num_classes
+            a_ = torch.ones(y.size()[0], y.size()[1], y.size()[2], dtype=torch.long) * args.num_classes
             a_ = a_.to(self.device)
-            y_ = torch.where(y==-1, a_, y).to(self.device)
-            gt_one_hot = self.get_one_hot(y_, args.num_classes+1).to(self.device)
+            y_ = torch.where(y == -1, a_, y).to(self.device)
+            gt_one_hot = self.get_one_hot(y_, args.num_classes + 1).to(self.device)
 
             outs_lay2 = []
             for i in args.selected_classes:
                 mask = torch.unsqueeze(gt_one_hot[:, i, :, :], 1)
-                mask = F.interpolate(mask, size=mid_lay2_ori.size()[2:],mode='nearest')
+                mask = F.interpolate(mask, size=mid_lay2_ori.size()[2:], mode='nearest')
                 out = mid_lay2_ori * mask
                 out = self.model.module.SAN_stage_2.IN(out)
                 # out = nn.InstanceNorm2d(512, affine=True)(out)
@@ -370,7 +366,6 @@ class Trainer():
             mid_lay1_label = sum(outs_lay1)
             mid_lay1_label = self.model.module.SAN_stage_1.relu(mid_lay1_label)
 
-
             # loss
             loss_main = self.loss(pred, y)
             loss_lay2 = 0.1 * self.loss(pred_lay2, y)
@@ -381,10 +376,9 @@ class Trainer():
             loss_iw_lay1 = 0.1 * mid_lay1_iwed
             cur_loss = loss_main + loss_lay2 + loss_lay1 + loss_in_lay2 + loss_in_lay1 + loss_iw_lay2 + loss_iw_lay1
 
-
             #########################
             lis = []
-            for i in range(19):
+            for i in range(2):
                 # non_zero_num = torch.nonzero(target).shape[0]
                 # print(type(non_zero_num))
                 gt = (y == i).float()  # B
@@ -397,7 +391,6 @@ class Trainer():
                 lis.append(k)
             pixel_num.append(lis)
             #########################
-
 
             if self.args.multi:
                 loss_2 = self.args.lambda_seg * self.loss(pred_2, y)
@@ -486,7 +479,7 @@ class Trainer():
         self.Eval.reset()
         with torch.no_grad():
             tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,
-                              desc="Val Epoch-{}-".format(self.current_epoch + 1),file=sys.stdout)
+                              desc="Val Epoch-{}-".format(self.current_epoch + 1), file=sys.stdout)
             if mode == 'val':
                 self.model.eval()
 
@@ -725,17 +718,19 @@ class Trainer():
 
 def add_train_args(arg_parser):
     # Path related arguments
-    arg_parser.add_argument('--data_root_path', type=str, default='../../DATASETS/datasets_seg/GTA5',
-                            help="the root path of dataset")
-    arg_parser.add_argument('--list_path', type=str, default='../datasets/GTA_640/list',
-                            help="the root path of dataset")
-    arg_parser.add_argument('--checkpoint_dir', default="./log/gta5_pretrain_2",
+
+    arg_parser.add_argument('--dataset', default='glue', type=str,
+                            help='dataset choice')
+    arg_parser.add_argument('--data_list', default=['Berlin2', 'Lisbon', 'milan', 'saipan2', 'tonga'], type=list,
+                            help='dataset choice')
+    arg_parser.add_argument('--val_dataset', type=str, default='glue')
+    arg_parser.add_argument('--checkpoint_dir', default="./log/glue",
                             help="the path of ckpt file")
     arg_parser.add_argument('--xuanran_path', default=None,
                             help="the path of ckpt file")
 
     # Model related arguments
-    arg_parser.add_argument('--weight_loss', default=True,
+    arg_parser.add_argument('--weight_loss', default=False,
                             help="if use weight loss")
     arg_parser.add_argument('--use_trained', default=False,
                             help="if use trained model")
@@ -763,34 +758,18 @@ def add_train_args(arg_parser):
                             help='input mix alpha')
 
     # dataset related arguments
-    arg_parser.add_argument('--dataset', default='gta5', type=str,
-                            help='dataset choice')
-    arg_parser.add_argument('--val_dataset', type=str, default='cityscapes',
-                        help='a list consists of cityscapes, mapillary, gtav, bdd100k, synthia')
-    arg_parser.add_argument('--base_size', default="640,640", type=str,
-                            help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="640,640", type=str,
-                            help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1024,512", type=str,
-                            help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1024,512", type=str,
-                            help='base size of target image')
-    arg_parser.add_argument('--num_classes', default=19, type=int,
+    arg_parser.add_argument('--num_classes', default=2, type=int,
                             help='num class of mask')
     arg_parser.add_argument('--data_loader_workers', default=1, type=int,
                             help='num_workers of Dataloader')
     arg_parser.add_argument('--pin_memory', default=2, type=int,
                             help='pin_memory of Dataloader')
-    arg_parser.add_argument('--split', type=str, default='train',
-                            help="choose from train/val/test/trainval/all")
     arg_parser.add_argument('--random_mirror', default=True, type=str2bool,
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
                             help='add random_crop')
     arg_parser.add_argument('--resize', default=True, type=str2bool,
                             help='resize')
-    arg_parser.add_argument('--gaussian_blur', default=True, type=str2bool,
-                            help='add gaussian_blur')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
                             help='image transform with numpy style')
     arg_parser.add_argument('--color_jitter', default=True, type=str2bool,
@@ -815,7 +794,7 @@ def add_train_args(arg_parser):
                             help="the path of ckpt file")
     arg_parser.add_argument('--poly_power', type=float, default=0.9,
                             help="poly_power")
-    arg_parser.add_argument('--selected_classes', default=[0,10,2,1,8],
+    arg_parser.add_argument('--selected_classes', default=[0, 1],
                             help="poly_power")
 
     # multi-level output
@@ -843,7 +822,6 @@ def init_args(args):
         args.crop_size = (int(crop_size[0]), int(crop_size[1]))
         args.base_size = (int(base_size[0]), int(base_size[1]))
 
-
     target_crop_size = args.target_crop_size.split(',')
     target_base_size = args.target_base_size.split(',')
     if len(target_crop_size) == 1:
@@ -860,14 +838,14 @@ def init_args(args):
     #         shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
     #     os.mkdir(args.checkpoint_dir)
 
-    if args.data_root_path is None:
-        args.data_root_path = datasets_path[args.dataset]['data_root_path']
-        args.list_path = datasets_path[args.dataset]['list_path']
-        args.image_filepath = datasets_path[args.dataset]['image_path']
-        args.gt_filepath = datasets_path[args.dataset]['gt_path']
-
-    args.class_16 = True if args.num_classes == 16 else False
-    args.class_13 = True if args.num_classes == 13 else False
+    # if args.data_root_path is None:
+    #     args.data_root_path = datasets_path[args.dataset]['data_root_path']
+    #     args.list_path = datasets_path[args.dataset]['list_path']
+    #     args.image_filepath = datasets_path[args.dataset]['image_path']
+    #     args.gt_filepath = datasets_path[args.dataset]['gt_path']
+    #
+    # args.class_16 = True if args.num_classes == 16 else False
+    # args.class_13 = True if args.num_classes == 13 else False
 
     # logger configure
     logger = logging.getLogger()
