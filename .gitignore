@@ -1,3 +1,9 @@
 pretrained_model/
 .idea/
 *.pyc
+*/.ipynb_checkpoints/
+/.ipynb_checkpoints/
+*/*/.ipynb_checkpoints/
+*checkpoint.py
+/log
+*checkpoint.py
