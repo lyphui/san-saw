@@ -382,8 +382,7 @@ class Trainer():
 
         #######
         mean = np.mean(pixel_num, axis=0)
-        sorted_id = sorted(range(len(mean)), key=lambda k: mean[k], reverse=True)
-        print(sorted_id)
+
         ########
 
         self.log_one_train_epoch(x, label, argpred, train_loss)
