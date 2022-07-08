@@ -18,6 +18,7 @@ model_urls = {
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
 
+
 class Bottleneck(nn.Module):
     expansion = 4
 
@@ -177,9 +178,8 @@ class ResNetMulti(nn.Module):
         layers = []
         layers.append(block(self.inplanes, planes, stride, dilation=dilation, downsample=downsample))
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks-1):
+        for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, dilation=dilation))
-        layers.append(block(self.inplanes, planes, dilation=dilation))
 
         return nn.Sequential(*layers)
 

@@ -329,68 +329,16 @@ class Trainer():
 #             print(pred)
             if isinstance(pred, tuple):
                 pred_2 = pred[1]
-                pred_lay2 = pred[2]
-                pred_lay1 = pred[3]
-                mid_lay2_ori = pred[4]
-                mid_lay2_ined = pred[5]
-                mid_lay1_ori = pred[6]
-                mid_lay1_ined = pred[7]
-                mid_lay2_iwed = pred[8]
-                mid_lay1_iwed = pred[9]
                 pred = pred[0]
 
             a_ = torch.ones(y.size()[0], y.size()[1], y.size()[2], dtype=torch.long) * args.num_classes
             a_ = a_.to(self.device)
             y_ = torch.where(y == -1, a_, y).to(self.device)
-            gt_one_hot = self.get_one_hot(y_, args.num_classes + 1).to(self.device)
-
-            outs_lay2 = []
-            for i in args.selected_classes:
-                mask = torch.unsqueeze(gt_one_hot[:, i, :, :], 1)
-                mask = F.interpolate(mask, size=mid_lay2_ori.size()[2:], mode='nearest')
-                out = mid_lay2_ori * mask
-                out = self.model.module.SAN_stage_2.IN(out)
-                # out = nn.InstanceNorm2d(512, affine=True)(out)
-                outs_lay2.append(out)
-            mid_lay2_label = sum(outs_lay2)
-            mid_lay2_label = self.model.module.SAN_stage_2.relu(mid_lay2_label)
-
-            outs_lay1 = []
-            for i in args.selected_classes:
-                mask = torch.unsqueeze(gt_one_hot[:, i, :, :], 1)
-                mask = F.interpolate(mask, size=mid_lay1_ori.size()[2:], mode='nearest')
-                out = mid_lay1_ori * mask
-                out = self.model.module.SAN_stage_1.IN(out)
-                # out = nn.InstanceNorm2d(512, affine=True)(out)
-                outs_lay1.append(out)
-            mid_lay1_label = sum(outs_lay1)
-            mid_lay1_label = self.model.module.SAN_stage_1.relu(mid_lay1_label)
 
             # loss
             loss_main = self.loss(pred, y)
-            loss_lay2 = 0.1 * self.loss(pred_lay2, y)
-            loss_lay1 = 0.1 * self.loss(pred_lay1, y)
-            loss_in_lay2 = 0.1 * F.smooth_l1_loss(mid_lay2_ined, mid_lay2_label)
-            loss_in_lay1 = 0.1 * F.smooth_l1_loss(mid_lay1_ined, mid_lay1_label)
-            loss_iw_lay2 = 0.1 * mid_lay2_iwed
-            loss_iw_lay1 = 0.1 * mid_lay1_iwed
-            cur_loss = loss_main + loss_lay2 + loss_lay1 + loss_in_lay2 + loss_in_lay1 + loss_iw_lay2 + loss_iw_lay1
 
-            #########################
-            lis = []
-            for i in range(2):
-                # non_zero_num = torch.nonzero(target).shape[0]
-                # print(type(non_zero_num))
-                gt = (y == i).float()  # B
-                inter = torch.sum(gt, dim=(0, 1, 2)).cpu().numpy()  # B
-
-                total_num = torch.prod(torch.tensor(y.shape)).float()
-
-                k = inter.item() / total_num.item()
-
-                lis.append(k)
-            pixel_num.append(lis)
-            #########################
+            cur_loss = loss_main
 
             if self.args.multi:
                 loss_2 = self.args.lambda_seg * self.loss(pred_2, y)
@@ -724,7 +672,7 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--train_data_list', default=['saipan','Berlin2', 'Kyoto','Berlin', 'Lisbon', 'milan', 'saipan2', 'tonga', 'Sierra', 'Berlin_na', 'Cyprus', 'Rhode5GP', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_data_list', default=['Milan5G','Yukun', 'Dubai', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_dataset', type=str, default='glue')
-    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_INW",
+    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_bn",
                             help="the path of ckpt file")
     arg_parser.add_argument('--xuanran_path', default=None,
                             help="the path of ckpt file")
@@ -734,7 +682,7 @@ def add_train_args(arg_parser):
                             help="if use weight loss")
     arg_parser.add_argument('--use_trained', default=False,
                             help="if use trained model")
-    arg_parser.add_argument('--backbone', default='Deeplab50_CLASS_INW',
+    arg_parser.add_argument('--backbone', default='Deeplab50_bn',
                             help="backbone of encoder")
     arg_parser.add_argument('--bn_momentum', type=float, default=0.1,
                             help="batch normalization momentum")
