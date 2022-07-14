@@ -208,28 +208,29 @@ class Trainer():
 
             self.train_one_epoch(pixel_num=pixel_num)
             # validate
-            PA, MPA, MIoU, FWIoU = self.validate()
-            self.writer.add_scalar('PA', PA, self.current_epoch)
-            self.writer.add_scalar('MPA', MPA, self.current_epoch)
-            self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
-            self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
-            #
-            self.current_MIoU = MIoU
-            is_best = MIoU > self.best_MIou
-            torch.save(self.model.module.state_dict(),
-                       os.path.join(args.checkpoint_dir, '{}.pt'.format(epoch)))
-
-            if is_best:
-
-                self.best_MIou = MIoU
-                self.best_iter = self.current_iter
-                self.logger.info("=>saving a new best checkpoint...")
-                self.save_checkpoint(self.train_id + 'best.pth')
+            if epoch%5==1:
+                PA, MPA, MIoU, FWIoU = self.validate()
+                self.writer.add_scalar('PA', PA, self.current_epoch)
+                self.writer.add_scalar('MPA', MPA, self.current_epoch)
+                self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
+                self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
+                #
+                self.current_MIoU = MIoU
+                is_best = MIoU > self.best_MIou
                 torch.save(self.model.module.state_dict(),
-                           os.path.join(args.checkpoint_dir, 'best.pt'))
-            else:
-                self.logger.info("=> The MIoU of val does't improve.")
-                self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
+                           os.path.join(args.checkpoint_dir, '{}.pt'.format(epoch)))
+
+                if is_best:
+                    self.best_MIou = MIoU
+                    self.best_iter = self.current_iter
+                    self.logger.info("=>saving a new best checkpoint...")
+                    self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
+                    self.save_checkpoint(self.train_id + 'best.pth')
+                    torch.save(self.model.module.state_dict(),
+                               os.path.join(args.checkpoint_dir, 'best.pt'))
+                else:
+                    self.logger.info("=> The MIoU of val does't improve.")
+                    self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
 
             self.current_epoch += 1
 
@@ -476,34 +477,24 @@ class Trainer():
 
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
-        self.Eval.reset()
+        if mode == 'val':
+            self.model.eval()
+
         with torch.no_grad():
+            self.Eval.reset()
             tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,
                               desc="Val Epoch-{}-".format(self.current_epoch + 1), file=sys.stdout)
-            if mode == 'val':
-                self.model.eval()
-
-            i = 0
-
             for x, y, id in tqdm_batch:
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
-
-                # model
                 pred = self.model(x)
                 if isinstance(pred, tuple):
-                    pred_2 = pred[1]
                     pred = pred[0]
-                    pred_P = F.softmax(pred, dim=1)
-                    pred_P_2 = F.softmax(pred_2, dim=1)
                 y = torch.squeeze(y, 1)
-
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
-
                 self.Eval.add_batch(label, argpred)
-
             # show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
                                         numpy_transform=self.args.numpy_transform)
@@ -514,32 +505,7 @@ class Trainer():
                 self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
                 self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
 
-            if 0:
-                def val_info(Eval, name):
-                    PA = Eval.Pixel_Accuracy()
-                    MPA_16, MPA_13 = Eval.Mean_Pixel_Accuracy()
-                    MIoU_16, MIoU_13 = Eval.Mean_Intersection_over_Union()
-                    FWIoU_16, FWIoU_13 = Eval.Frequency_Weighted_Intersection_over_Union()
-                    PC_16, PC_13 = Eval.Mean_Precision()
-                    print("########## Eval{} ############".format(name))
 
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA_16,
-                            MIoU_16, FWIoU_16, PC_16))
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA_13,
-                            MIoU_13, FWIoU_13, PC_13))
-                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA_16' + name, MPA_16, self.current_epoch)
-                    self.writer.add_scalar('MIoU_16' + name, MIoU_16, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_16' + name, FWIoU_16, self.current_epoch)
-                    self.writer.add_scalar('MPA_13' + name, MPA_13, self.current_epoch)
-                    self.writer.add_scalar('MIoU_13' + name, MIoU_13, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_13' + name, FWIoU_13, self.current_epoch)
-                    return PA, MPA_13, MIoU_13, FWIoU_13
-            else:
                 def val_info(Eval, name):
                     PA = Eval.Pixel_Accuracy()
                     MPA = Eval.Mean_Pixel_Accuracy()
@@ -724,7 +690,7 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--train_data_list', default=['saipan','Berlin2', 'Kyoto','Berlin', 'Lisbon', 'milan', 'saipan2', 'tonga', 'Sierra', 'Berlin_na', 'Cyprus', 'Rhode5GP', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_data_list', default=['Milan5G','Yukun', 'Dubai', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_dataset', type=str, default='glue')
-    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_INW2_cls1",
+    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_INW2",
                             help="the path of ckpt file")
     arg_parser.add_argument('--xuanran_path', default=None,
                             help="the path of ckpt file")
@@ -796,7 +762,7 @@ def add_train_args(arg_parser):
                             help="the path of ckpt file")
     arg_parser.add_argument('--poly_power', type=float, default=0.9,
                             help="poly_power")
-    arg_parser.add_argument('--selected_classes', default=[ 1],
+    arg_parser.add_argument('--selected_classes', default=[0, 1],
                             help="poly_power")
 
     # multi-level output

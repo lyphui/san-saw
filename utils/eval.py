@@ -54,8 +54,8 @@ class Eval():
             MIoU_16 = np.nanmean(MIoU[synthia_set_16])
             MIoU_13 = np.nanmean(MIoU[synthia_set_13])
             return MIoU_16, MIoU_13
+        print(MIoU)
         MIoU = np.nanmean(MIoU[:self.ignore_index])
-
         return MIoU
 
     def Frequency_Weighted_Intersection_over_Union(self, out_16_13=False):
