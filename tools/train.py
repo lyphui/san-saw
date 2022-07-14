@@ -368,8 +368,8 @@ class Trainer():
 
             # loss
             loss_main = self.loss(pred, y)
-            loss_lay2 = 0.1 * self.loss(pred_lay2, y)
-            loss_lay1 = 0.1 * self.loss(pred_lay1, y)
+            loss_lay2 = 0.2 * self.loss(pred_lay2, y)
+            loss_lay1 = 0.2 * self.loss(pred_lay1, y)
             loss_in_lay2 = 0.1 * F.smooth_l1_loss(mid_lay2_ined, mid_lay2_label)
             loss_in_lay1 = 0.1 * F.smooth_l1_loss(mid_lay1_ined, mid_lay1_label)
             loss_iw_lay2 = 0.1 * mid_lay2_iwed
