@@ -24,20 +24,6 @@ from datasets.gta5_Dataset import GTA5_DataLoader, GTA5_xuanran_DataLoader, Mix_
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
 from datasets.glue_Datasets import Glue_DataLoader
 
-datasets_path = {
-    'cityscapes': {'data_root_path': '../../DATASETS/datasets_original/Cityscapes',
-                   'list_path': '../datasets/city_list',
-                   'image_path': '../../DATASETS/datasets_original/Cityscapes/leftImg8bit',
-                   'gt_path': '../../DATASETS/datasets_original/Cityscapes/gtFine'},
-    'gta5': {'data_root_path': '../../DATASETS/datasets_seg/GTA5', 'list_path': '../datasets/GTA5/list',
-             'image_path': '../../DATASETS/datasets_seg/GTA5/images',
-             'gt_path': './datasets/GTA5/labels'},
-    'synthia': {'data_root_path': './datasets/SYNTHIA', 'list_path': './datasets/SYNTHIA/list',
-                'image_path': './datasets/SYNTHIA/RGB',
-                'gt_path': './datasets/SYNTHIA/GT/LABELS'},
-    'NTHU': {'data_root_path': './datasets/NTHU_Datasets', 'list_path': './datasets/NTHU_list'}
-}
-
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -91,10 +77,7 @@ class Trainer():
         self.args = args
         ITER_MAX = args.each_epoch_iters
         self.device = torch.device('cuda:{}'.format(device_ids[0]))
-        # os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
-        # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
         self.cuda = cuda and torch.cuda.is_available()
-        # self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
         self.logger = logger
 
@@ -129,15 +112,6 @@ class Trainer():
         # self.model.to(self.device)
         self.model = self.model.cuda()
         self.model = torch.nn.DataParallel(self.model, device_ids=device_ids)
-
-        # if torch.cuda.is_available():
-        #     if len(device_ids) > 1:
-        #         self.model.to(torch.device('cuda:{}'.format(0)))
-        #         self.model = torch.nn.DataParallel(self.model, device_ids=device_ids)
-        #     else:
-        #         self.model.to(torch.device('cuda:{}'.format(0)))
-        # self.model = nn.DataParallel(self.model, device_ids=[0,1,2,3,4,5,6])
-        # self.model.to(self.device)
 
         if self.args.optim == "SGD":
             self.optimizer = torch.optim.SGD(
@@ -208,28 +182,29 @@ class Trainer():
 
             self.train_one_epoch(pixel_num=pixel_num)
             # validate
-            PA, MPA, MIoU, FWIoU = self.validate()
-            self.writer.add_scalar('PA', PA, self.current_epoch)
-            self.writer.add_scalar('MPA', MPA, self.current_epoch)
-            self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
-            self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
-            #
-            self.current_MIoU = MIoU
-            is_best = MIoU > self.best_MIou
-            torch.save(self.model.module.state_dict(),
-                       os.path.join(args.checkpoint_dir, '{}.pt'.format(epoch)))
-
-            if is_best:
-
-                self.best_MIou = MIoU
-                self.best_iter = self.current_iter
-                self.logger.info("=>saving a new best checkpoint...")
-                self.save_checkpoint(self.train_id + 'best.pth')
+            if epoch%5==1:
+                PA, MPA, MIoU, FWIoU = self.validate()
+                self.writer.add_scalar('PA', PA, self.current_epoch)
+                self.writer.add_scalar('MPA', MPA, self.current_epoch)
+                self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
+                self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
+                #
+                self.current_MIoU = MIoU
+                is_best = MIoU > self.best_MIou
                 torch.save(self.model.module.state_dict(),
-                           os.path.join(args.checkpoint_dir, 'best.pt'))
-            else:
-                self.logger.info("=> The MIoU of val does't improve.")
-                self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
+                           os.path.join(args.checkpoint_dir, '{}.pt'.format(epoch)))
+
+                if is_best:
+                    self.best_MIou = MIoU
+                    self.best_iter = self.current_iter
+                    self.logger.info("=>saving a new best checkpoint...")
+                    self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
+                    self.save_checkpoint(self.train_id + 'best.pth')
+                    torch.save(self.model.module.state_dict(),
+                               os.path.join(args.checkpoint_dir, 'best.pt'))
+                else:
+                    self.logger.info("=> The MIoU of val does't improve.")
+                    self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
 
             self.current_epoch += 1
 
@@ -315,18 +290,6 @@ class Trainer():
                 if "classifier_2.weight" in key:
                     selected_keys_classify_2.append(key)
 
-            # for key in selected_keys_classify_1:
-            #     if "num_batches_tracked" in key:
-            #         continue
-            #     weights_t = self.model.state_dict()[key]
-#             classsifier_1_weights = weights_t.squeeze()
-#             for key in selected_keys_classify_2:
-#                 if "num_batches_tracked" in key:
-#                     continue
-#                 weights_t = self.model.state_dict()[key]
-#             classsifier_2_weights = weights_t.squeeze()
-#             # print(classsifier_1_weights.size(),classsifier_2_weights.size())
-#             print(pred)
             if isinstance(pred, tuple):
                 pred_2 = pred[1]
                 pred = pred[0]
@@ -423,34 +386,41 @@ class Trainer():
 
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
-        self.Eval.reset()
+        if mode == 'val':
+            self.model.eval()
+
+        def val_info(Eval, name):
+            PA = Eval.Pixel_Accuracy()
+            MPA = Eval.Mean_Pixel_Accuracy()
+            MIoU = Eval.Mean_Intersection_over_Union()
+            FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
+            PC = Eval.Mean_Precision()
+            print("########## Eval{} ############".format(name))
+
+            self.logger.info(
+                '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
+                    self.current_epoch, name, PA, MPA,
+                    MIoU, FWIoU, PC))
+            self.writer.add_scalar('PA' + name, PA, self.current_epoch)
+            self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
+            self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
+            self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
+            return PA, MPA, MIoU, FWIoU
+
         with torch.no_grad():
-            tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,
-                              desc="Val Epoch-{}-".format(self.current_epoch + 1), file=sys.stdout)
-            if mode == 'val':
-                self.model.eval()
-
-            i = 0
-
+            self.Eval.reset()
+            tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,desc="Source Val Epoch{}-".format(self.current_epoch + 1), file=sys.stdout)
             for x, y, id in tqdm_batch:
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
-
-                # model
                 pred = self.model(x)
                 if isinstance(pred, tuple):
-                    pred_2 = pred[1]
                     pred = pred[0]
-                    pred_P = F.softmax(pred, dim=1)
-                    pred_P_2 = F.softmax(pred_2, dim=1)
                 y = torch.squeeze(y, 1)
-
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
-
                 self.Eval.add_batch(label, argpred)
-
             # show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
                                         numpy_transform=self.args.numpy_transform)
@@ -460,52 +430,33 @@ class Trainer():
                 self.writer.add_image(str(index) + '/Images', img, self.current_epoch)
                 self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
                 self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
+            val_info(self.Eval, "source")
+            tqdm_batch.close()
 
-            if 0:
-                def val_info(Eval, name):
-                    PA = Eval.Pixel_Accuracy()
-                    MPA_16, MPA_13 = Eval.Mean_Pixel_Accuracy()
-                    MIoU_16, MIoU_13 = Eval.Mean_Intersection_over_Union()
-                    FWIoU_16, FWIoU_13 = Eval.Frequency_Weighted_Intersection_over_Union()
-                    PC_16, PC_13 = Eval.Mean_Precision()
-                    print("########## Eval{} ############".format(name))
-
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA_16,
-                            MIoU_16, FWIoU_16, PC_16))
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA_13,
-                            MIoU_13, FWIoU_13, PC_13))
-                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA_16' + name, MPA_16, self.current_epoch)
-                    self.writer.add_scalar('MIoU_16' + name, MIoU_16, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_16' + name, FWIoU_16, self.current_epoch)
-                    self.writer.add_scalar('MPA_13' + name, MPA_13, self.current_epoch)
-                    self.writer.add_scalar('MIoU_13' + name, MIoU_13, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_13' + name, FWIoU_13, self.current_epoch)
-                    return PA, MPA_13, MIoU_13, FWIoU_13
-            else:
-                def val_info(Eval, name):
-                    PA = Eval.Pixel_Accuracy()
-                    MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU = Eval.Mean_Intersection_over_Union()
-                    FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
-                    PC = Eval.Mean_Precision()
-                    print("########## Eval{} ############".format(name))
-
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA,
-                            MIoU, FWIoU, PC))
-                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
-                    self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
-                    self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
-                    return PA, MPA, MIoU, FWIoU
-
-            PA, MPA, MIoU, FWIoU = val_info(self.Eval, "")
+            self.Eval.reset()
+            tqdm_batch = tqdm(self.test_dataloader.val_loader1, total=self.test_dataloader.valid_iterations1,
+                              desc="Target Val Epoch{}-".format(self.current_epoch + 1), file=sys.stdout)
+            for x, y, id in tqdm_batch:
+                if self.cuda:
+                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    pred = pred[0]
+                y = torch.squeeze(y, 1)
+                pred = pred.data.cpu().numpy()
+                label = y.cpu().numpy()
+                argpred = np.argmax(pred, axis=1)
+                self.Eval.add_batch(label, argpred)
+            # show val result on tensorboard
+            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                        numpy_transform=self.args.numpy_transform)
+            labels_colors = decode_labels(label, self.args.show_num_images)
+            preds_colors = decode_labels(argpred, self.args.show_num_images)
+            for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
+                self.writer.add_image(str(index) + '/Images', img, self.current_epoch)
+                self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
+                self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
+            PA, MPA, MIoU, FWIoU = val_info(self.Eval, "target")
             tqdm_batch.close()
 
         return PA, MPA, MIoU, FWIoU
@@ -668,10 +619,10 @@ def add_train_args(arg_parser):
 
     arg_parser.add_argument('--dataset', default='glue', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--train_data_list', default=['saipan','Berlin2', 'Kyoto','Berlin', 'Lisbon', 'milan', 'saipan2', 'tonga', 'Sierra', 'Berlin_na', 'Cyprus', 'Rhode5GP', ], type=list,help='dataset choice')
-    arg_parser.add_argument('--val_data_list', default=['Milan5G','Yukun', 'Dubai', ], type=list,help='dataset choice')
+    arg_parser.add_argument('--train_data_list', default=[ ], type=list,help='dataset choice')
+    arg_parser.add_argument('--val_data_list', default=[], type=list,help='dataset choice')
     arg_parser.add_argument('--val_dataset', type=str, default='glue')
-    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_bn",
+    arg_parser.add_argument('--checkpoint_dir', default="./log/exp/Deeplab50_bn",
                             help="the path of ckpt file")
     arg_parser.add_argument('--xuanran_path', default=None,
                             help="the path of ckpt file")
@@ -685,7 +636,7 @@ def add_train_args(arg_parser):
                             help="backbone of encoder")
     arg_parser.add_argument('--bn_momentum', type=float, default=0.1,
                             help="batch normalization momentum")
-    arg_parser.add_argument('--imagenet_pretrained', type=str2bool, default=True, 
+    arg_parser.add_argument('--imagenet_pretrained', type=str2bool, default=True,
                             help="whether apply imagenet pretrained weights")
     arg_parser.add_argument('--pretrained_ckpt_file', type=str, default=None,
                             help="whether apply pretrained checkpoint")
@@ -715,7 +666,7 @@ def add_train_args(arg_parser):
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
                             help='add random_crop')
-    arg_parser.add_argument('--resize', default=True, type=str2bool,
+    arg_parser.add_argument('--resize', default=False, type=str2bool,
                             help='resize')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
                             help='image transform with numpy style')
@@ -748,7 +699,7 @@ def add_train_args(arg_parser):
 
     # multi-level output
 
-    arg_parser.add_argument('--multi', default=False, type=str2bool,
+    arg_parser.add_argument('--multi', default=True, type=str2bool,
                             help='output model middle feature')
     arg_parser.add_argument('--lambda_seg', type=float, default=0.1,
                             help="lambda_seg of middle output")
@@ -762,41 +713,6 @@ def init_args(args):
 
     train_id = str(args.dataset)
 
-#     crop_size = args.crop_size.split(',')
-#     base_size = args.base_size.split(',')
-#     if len(crop_size) == 1:
-#         args.crop_size = int(crop_size[0])
-#         args.base_size = int(base_size[0])
-#     else:
-#         args.crop_size = (int(crop_size[0]), int(crop_size[1]))
-#         args.base_size = (int(base_size[0]), int(base_size[1]))
-
-#     target_crop_size = args.target_crop_size.split(',')
-#     target_base_size = args.target_base_size.split(',')
-#     if len(target_crop_size) == 1:
-#         args.target_crop_size = int(target_crop_size[0])
-#         args.target_base_size = int(target_base_size[0])
-#     else:
-#         args.target_crop_size = (int(target_crop_size[0]), int(target_crop_size[1]))
-#         args.target_base_size = (int(target_base_size[0]), int(target_base_size[1]))
-
-    # if not args.continue_training:
-    #     if os.path.exists(args.checkpoint_dir):
-    #         print("checkpoint dir exists, which will be removed")
-    #         import shutil
-    #         shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
-    #     os.mkdir(args.checkpoint_dir)
-
-    # if args.data_root_path is None:
-    #     args.data_root_path = datasets_path[args.dataset]['data_root_path']
-    #     args.list_path = datasets_path[args.dataset]['list_path']
-    #     args.image_filepath = datasets_path[args.dataset]['image_path']
-    #     args.gt_filepath = datasets_path[args.dataset]['gt_path']
-    #
-    # args.class_16 = True if args.num_classes == 16 else False
-    # args.class_13 = True if args.num_classes == 13 else False
-
-    # logger configure
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     fh = logging.FileHandler(os.path.join(args.checkpoint_dir, 'train_log.txt'))
