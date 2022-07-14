@@ -710,8 +710,8 @@ def add_train_args(arg_parser):
 
     arg_parser.add_argument('--dataset', default='glue', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--train_data_list', default=['saipan','Berlin2', 'Kyoto','Berlin', 'Lisbon', 'milan', 'saipan2', 'tonga', 'Sierra', 'Berlin_na', 'Cyprus', 'Rhode5GP', ], type=list,help='dataset choice')
-    arg_parser.add_argument('--val_data_list', default=['Milan5G','Yukun', 'Dubai', ], type=list,help='dataset choice')
+    arg_parser.add_argument('--train_data_list', default=[ ], type=list,help='dataset choice')
+    arg_parser.add_argument('--val_data_list', default=[], type=list,help='dataset choice')
     arg_parser.add_argument('--val_dataset', type=str, default='glue')
     arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_INW2",
                             help="the path of ckpt file")
