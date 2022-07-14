@@ -480,10 +480,27 @@ class Trainer():
         if mode == 'val':
             self.model.eval()
 
+        def val_info(Eval, name):
+            PA = Eval.Pixel_Accuracy()
+            MPA = Eval.Mean_Pixel_Accuracy()
+            MIoU = Eval.Mean_Intersection_over_Union()
+            FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
+            PC = Eval.Mean_Precision()
+            print("########## Eval{} ############".format(name))
+
+            self.logger.info(
+                '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
+                    self.current_epoch, name, PA, MPA,
+                    MIoU, FWIoU, PC))
+            self.writer.add_scalar('PA' + name, PA, self.current_epoch)
+            self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
+            self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
+            self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
+            return PA, MPA, MIoU, FWIoU
+
         with torch.no_grad():
             self.Eval.reset()
-            tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,
-                              desc="Val Epoch-{}-".format(self.current_epoch + 1), file=sys.stdout)
+            tqdm_batch = tqdm(self.test_dataloader.val_loader, total=self.test_dataloader.valid_iterations,desc="Source Val Epoch{}-".format(self.current_epoch + 1), file=sys.stdout)
             for x, y, id in tqdm_batch:
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -504,27 +521,33 @@ class Trainer():
                 self.writer.add_image(str(index) + '/Images', img, self.current_epoch)
                 self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
                 self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
+            val_info(self.Eval, "source")
+            tqdm_batch.close()
 
-
-                def val_info(Eval, name):
-                    PA = Eval.Pixel_Accuracy()
-                    MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU = Eval.Mean_Intersection_over_Union()
-                    FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
-                    PC = Eval.Mean_Precision()
-                    print("########## Eval{} ############".format(name))
-
-                    self.logger.info(
-                        '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
-                            self.current_epoch, name, PA, MPA,
-                            MIoU, FWIoU, PC))
-                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
-                    self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
-                    self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
-                    return PA, MPA, MIoU, FWIoU
-
-            PA, MPA, MIoU, FWIoU = val_info(self.Eval, "")
+            self.Eval.reset()
+            tqdm_batch = tqdm(self.test_dataloader.val_loader1, total=self.test_dataloader.valid_iterations1,
+                              desc="Target Val Epoch{}-".format(self.current_epoch + 1), file=sys.stdout)
+            for x, y, id in tqdm_batch:
+                if self.cuda:
+                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    pred = pred[0]
+                y = torch.squeeze(y, 1)
+                pred = pred.data.cpu().numpy()
+                label = y.cpu().numpy()
+                argpred = np.argmax(pred, axis=1)
+                self.Eval.add_batch(label, argpred)
+            # show val result on tensorboard
+            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                        numpy_transform=self.args.numpy_transform)
+            labels_colors = decode_labels(label, self.args.show_num_images)
+            preds_colors = decode_labels(argpred, self.args.show_num_images)
+            for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
+                self.writer.add_image(str(index) + '/Images', img, self.current_epoch)
+                self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
+                self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
+            PA, MPA, MIoU, FWIoU = val_info(self.Eval, "target")
             tqdm_batch.close()
 
         return PA, MPA, MIoU, FWIoU

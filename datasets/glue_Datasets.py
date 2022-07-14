@@ -31,7 +31,7 @@ def make_dj_dataset_from_csv(data_file_path, data_source_list):
 
     for i, img_path in enumerate(image_path_list):
         data_source = source_list[i]
-        if data_source in data_source_list:
+        if 1:
             label_path = img_path.replace('.jpg', '.png')
             item = (img_path, label_path)
             image_label_list.append(item)
@@ -203,22 +203,22 @@ class Glue_DataLoader():
         args.glue = True
         self.args = args
 
-        train_sets = []
-        val_sets = []
-        val_dataset_names = []
-
         train_joint_transform_list, train_joint_transform = get_train_joint_transform(args)
         train_input_transform, val_input_transform = get_input_transforms(args)
         target_transform, target_train_transform, target_aux_train_transform = get_target_transforms(args)
 
-        train_sets = Glue('./datasets/assets/tr_0705.csv', args.train_data_list,
+        train_sets = Glue('./datasets/assets/train.csv', args.train_data_list,
                                          joint_transform=train_joint_transform,
                                          transform=train_input_transform,
                                          target_transform=target_train_transform,
                                          target_aux_transform=target_aux_train_transform,
                                          image_in=False)
         
-        val_sets = Glue('./datasets/assets/tr_0705.csv', args.val_data_list,
+        val_sets = Glue('./datasets/assets/val.csv', args.val_data_list,
+                       transform=val_input_transform,
+                       target_transform=target_transform,
+                       image_in=False)
+        val_sets1 = Glue('./datasets/assets/val_out.csv', args.val_data_list,
                        transform=val_input_transform,
                        target_transform=target_transform,
                        image_in=False)
@@ -250,8 +250,16 @@ class Glue_DataLoader():
                                           num_workers=self.args.data_loader_workers,
                                           pin_memory=self.args.pin_memory,
                                           drop_last=True)
+
+        self.val_loader1 = data.DataLoader(val_sets1,
+                                          batch_size=1,
+                                          shuffle=False,
+                                          num_workers=self.args.data_loader_workers,
+                                          pin_memory=self.args.pin_memory,
+                                          drop_last=True)
         print('len(val_sets)',len(val_sets))
         self.valid_iterations = (len(val_sets) + 1) // 1
+        self.valid_iterations1 = (len(val_sets1) + 1) // 1
 
         self.num_iterations = (len(train_sets) + 1) // bs
 
