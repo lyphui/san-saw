@@ -734,11 +734,11 @@ def add_train_args(arg_parser):
                             help="if use weight loss")
     arg_parser.add_argument('--use_trained', default=False,
                             help="if use trained model")
-    arg_parser.add_argument('--backbone', default='Deeplab50_CLASS_IN',
+    arg_parser.add_argument('--backbone', default='Deeplab50_CLASS_INW',
                             help="backbone of encoder")
     arg_parser.add_argument('--bn_momentum', type=float, default=0.1,
                             help="batch normalization momentum")
-    arg_parser.add_argument('--imagenet_pretrained', type=str2bool, default=True, 
+    arg_parser.add_argument('--imagenet_pretrained', type=str2bool, default=True,
                             help="whether apply imagenet pretrained weights")
     arg_parser.add_argument('--pretrained_ckpt_file', type=str, default=None,
                             help="whether apply pretrained checkpoint")
@@ -768,7 +768,7 @@ def add_train_args(arg_parser):
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
                             help='add random_crop')
-    arg_parser.add_argument('--resize', default=True, type=str2bool,
+    arg_parser.add_argument('--resize', default=False, type=str2bool,
                             help='resize')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
                             help='image transform with numpy style')
@@ -801,7 +801,7 @@ def add_train_args(arg_parser):
 
     # multi-level output
 
-    arg_parser.add_argument('--multi', default=False, type=str2bool,
+    arg_parser.add_argument('--multi', default=True, type=str2bool,
                             help='output model middle feature')
     arg_parser.add_argument('--lambda_seg', type=float, default=0.1,
                             help="lambda_seg of middle output")
@@ -815,41 +815,6 @@ def init_args(args):
 
     train_id = str(args.dataset)
 
-#     crop_size = args.crop_size.split(',')
-#     base_size = args.base_size.split(',')
-#     if len(crop_size) == 1:
-#         args.crop_size = int(crop_size[0])
-#         args.base_size = int(base_size[0])
-#     else:
-#         args.crop_size = (int(crop_size[0]), int(crop_size[1]))
-#         args.base_size = (int(base_size[0]), int(base_size[1]))
-
-#     target_crop_size = args.target_crop_size.split(',')
-#     target_base_size = args.target_base_size.split(',')
-#     if len(target_crop_size) == 1:
-#         args.target_crop_size = int(target_crop_size[0])
-#         args.target_base_size = int(target_base_size[0])
-#     else:
-#         args.target_crop_size = (int(target_crop_size[0]), int(target_crop_size[1]))
-#         args.target_base_size = (int(target_base_size[0]), int(target_base_size[1]))
-
-    # if not args.continue_training:
-    #     if os.path.exists(args.checkpoint_dir):
-    #         print("checkpoint dir exists, which will be removed")
-    #         import shutil
-    #         shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
-    #     os.mkdir(args.checkpoint_dir)
-
-    # if args.data_root_path is None:
-    #     args.data_root_path = datasets_path[args.dataset]['data_root_path']
-    #     args.list_path = datasets_path[args.dataset]['list_path']
-    #     args.image_filepath = datasets_path[args.dataset]['image_path']
-    #     args.gt_filepath = datasets_path[args.dataset]['gt_path']
-    #
-    # args.class_16 = True if args.num_classes == 16 else False
-    # args.class_13 = True if args.num_classes == 13 else False
-
-    # logger configure
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     fh = logging.FileHandler(os.path.join(args.checkpoint_dir, 'train_log.txt'))

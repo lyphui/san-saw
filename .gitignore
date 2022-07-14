@@ -7,3 +7,6 @@ pretrained_model/
 *checkpoint.py
 /log
 *checkpoint.py
+/tools/log/
+tools/test/
+*.pth
