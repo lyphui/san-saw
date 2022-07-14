@@ -724,7 +724,7 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--train_data_list', default=['saipan','Berlin2', 'Kyoto','Berlin', 'Lisbon', 'milan', 'saipan2', 'tonga', 'Sierra', 'Berlin_na', 'Cyprus', 'Rhode5GP', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_data_list', default=['Milan5G','Yukun', 'Dubai', ], type=list,help='dataset choice')
     arg_parser.add_argument('--val_dataset', type=str, default='glue')
-    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_IN_cls1",
+    arg_parser.add_argument('--checkpoint_dir', default="./log/Deeplab50_CLASS_INW2_cls1",
                             help="the path of ckpt file")
     arg_parser.add_argument('--xuanran_path', default=None,
                             help="the path of ckpt file")
@@ -734,7 +734,7 @@ def add_train_args(arg_parser):
                             help="if use weight loss")
     arg_parser.add_argument('--use_trained', default=False,
                             help="if use trained model")
-    arg_parser.add_argument('--backbone', default='Deeplab50_CLASS_INW',
+    arg_parser.add_argument('--backbone', default='Deeplab50_CLASS_INW2',
                             help="backbone of encoder")
     arg_parser.add_argument('--bn_momentum', type=float, default=0.1,
                             help="batch normalization momentum")
