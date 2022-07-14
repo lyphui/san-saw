@@ -24,20 +24,6 @@ from datasets.gta5_Dataset import GTA5_DataLoader, GTA5_xuanran_DataLoader, Mix_
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
 from datasets.glue_Datasets import Glue_DataLoader
 
-datasets_path = {
-    'cityscapes': {'data_root_path': '../../DATASETS/datasets_original/Cityscapes',
-                   'list_path': '../datasets/city_list',
-                   'image_path': '../../DATASETS/datasets_original/Cityscapes/leftImg8bit',
-                   'gt_path': '../../DATASETS/datasets_original/Cityscapes/gtFine'},
-    'gta5': {'data_root_path': '../../DATASETS/datasets_seg/GTA5', 'list_path': '../datasets/GTA5/list',
-             'image_path': '../../DATASETS/datasets_seg/GTA5/images',
-             'gt_path': './datasets/GTA5/labels'},
-    'synthia': {'data_root_path': './datasets/SYNTHIA', 'list_path': './datasets/SYNTHIA/list',
-                'image_path': './datasets/SYNTHIA/RGB',
-                'gt_path': './datasets/SYNTHIA/GT/LABELS'},
-    'NTHU': {'data_root_path': './datasets/NTHU_Datasets', 'list_path': './datasets/NTHU_list'}
-}
-
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -91,10 +77,7 @@ class Trainer():
         self.args = args
         ITER_MAX = args.each_epoch_iters
         self.device = torch.device('cuda:{}'.format(device_ids[0]))
-        # os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
-        # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
         self.cuda = cuda and torch.cuda.is_available()
-        # self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
         self.logger = logger
 
@@ -129,15 +112,6 @@ class Trainer():
         # self.model.to(self.device)
         self.model = self.model.cuda()
         self.model = torch.nn.DataParallel(self.model, device_ids=device_ids)
-
-        # if torch.cuda.is_available():
-        #     if len(device_ids) > 1:
-        #         self.model.to(torch.device('cuda:{}'.format(0)))
-        #         self.model = torch.nn.DataParallel(self.model, device_ids=device_ids)
-        #     else:
-        #         self.model.to(torch.device('cuda:{}'.format(0)))
-        # self.model = nn.DataParallel(self.model, device_ids=[0,1,2,3,4,5,6])
-        # self.model.to(self.device)
 
         if self.args.optim == "SGD":
             self.optimizer = torch.optim.SGD(
@@ -316,18 +290,6 @@ class Trainer():
                 if "classifier_2.weight" in key:
                     selected_keys_classify_2.append(key)
 
-            # for key in selected_keys_classify_1:
-            #     if "num_batches_tracked" in key:
-            #         continue
-            #     weights_t = self.model.state_dict()[key]
-#             classsifier_1_weights = weights_t.squeeze()
-#             for key in selected_keys_classify_2:
-#                 if "num_batches_tracked" in key:
-#                     continue
-#                 weights_t = self.model.state_dict()[key]
-#             classsifier_2_weights = weights_t.squeeze()
-#             # print(classsifier_1_weights.size(),classsifier_2_weights.size())
-#             print(pred)
             if isinstance(pred, tuple):
                 pred_2 = pred[1]
                 pred_lay2 = pred[2]
